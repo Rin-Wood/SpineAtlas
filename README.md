@@ -152,7 +152,7 @@ ReOffset(atlas_cls.atlas) # Recalculate Offset X/Y starting from the bottom left
 text = atlas_cls.atlas.ConvertText # List[str]
 sline('1_ReOffset.atlas', text)
 ```
-# # Convert image to premultiplied/non-premultiplied
+# Convert image to premultiplied/non-premultiplied
 ```python
 from PIL.Image import open as imgop
 from SpineAtlas import ImgPremultiplied, ImgNonPremultiplied
