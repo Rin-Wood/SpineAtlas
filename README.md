@@ -11,61 +11,34 @@ pip install SpineAtlas
 ## Usage
 # Opening and saving atlas
 ```python
-from SpineAtlas import rbin, sline, SpineAtlas
+from SpineAtlas import ReadAtlasFile
 
-data = rbin('1.atlas')
-atlas_cls = SpineAtlas(data)
-# version is bool, True is 4.x, False is 3.x
-if atlas_cls.atlas.version:
-    # if atlas version is 4.x, save 3.x
-    atlas_cls.atlas.version = False
-else:
-    # if atlas version is 3.x, save 4.x
-    atlas_cls.atlas.version = True
-text = atlas_cls.atlas.ConvertText # List[str]
-sline('1_mod.atlas', text)
+atlas = ReadAtlasFile('1.atlas')
+# The code will automatically determine the format of Atlas
+atlas.version = True # Convert to Atlas 4.0 format
+atlas.version = False # Convert to Atlas 3.0 format
+atlas.SaveAtlas('1_v4.atlas')
 ```
 # Modify the texture scaling of the atlas
 ```python
-from SpineAtlas import rbin, sline, SpineAtlas, AtlasScale
+from SpineAtlas import ReadAtlasFile
 
-data = rbin('1.atlas')
-atlas_cls = SpineAtlas(data)
-for i in atlas_cls.atlas.atlas:
-    # Get the width/height of png
-    png = rbin(i.png, 24)[16:]
-    pwidth, pheight = int.from_bytes(png[:4], byteorder='big'), int.from_bytes(png[4:], byteorder='big')
-    # Get the width/height of atlas
-    width, height = i.w, i.h
-    # Calculate scaling and modify
-    wscale, hscale = pwidth / width, pheight / height
-    AtlasScale(i, wscale, hscale)
-    # Reset the width/height of the texture in Atlas
-    i.w, i.h = pwidth, pheight
-text = atlas_cls.atlas.ConvertText # List[str]
-sline('1_scale.atlas', text)
+atlas = ReadAtlasFile('1.atlas')
+# If the texture and atlas are in the same directory, you don't need to pass the path
+atlas.ReScale()
+atlas.SaveAtlas('1_scale.atlas')
 ```
 # Export atlas frames
 ```python
-from pathlib import Path
-from PIL.Image import open as imgop
-from SpineAtlas import rbin, SpineAtlas, AtlasImg
+from SpineAtlas import ReadAtlasFile
 
-p = Path.cwd().joinpath('frames')
-p.mkdir(parents=True, exist_ok=True)
-
-data = rbin('1.atlas')
-atlas_cls = SpineAtlas(data)
-texs = {i.png:imgop(i.png) for i in atlas_cls.atlas.atlas} # set png dict
-imgs = AtlasImg(texs, atlas_cls) # get frames
-for k, v in imgs.items():
-    png = p.joinpath(f'{k}.png')
-    png.parent.mkdir(parents=True, exist_ok=True)
-    v.save(png.as_posix())
+atlas = ReadAtlasFile('1.atlas')
+# If the texture and atlas are in the same directory, you don't need to pass the texture path
+atlas.SaveFrames(path='1_frames')
 ```
 # Convert other formats to `Spine Atlas`
 ```python
-from SpineAtlas import Atlas, Anchor, AtlasTex, AtlasFrame, ReOffset
+from SpineAtlas import Atlas, AtlasTex, AtlasFrame
 
 '''
 {
@@ -99,12 +72,11 @@ for i in TextureDict['Frame']:
 tex = TextureDict['Texture']
 texture = AtlasTex(tex['Texture_Name'], tex['Texture_Wdith'], tex['Texture_Height'], frames=frames)
 atlas = Atlas([texture])
-text = atlas_cls.atlas.ConvertText # List[str]
-sline('1.atlas', text)
+atlas.SaveAtlas('1.atlas')
 ```
 # Recalculate the clipping anchor point
 ```python
-from SpineAtlas import rbin, sline, Anchor, SpineAtlas, ReOffset
+from SpineAtlas import ReadAtlasFile, Anchor
 
 '''
 class Anchor(IntEnum):
@@ -119,17 +91,15 @@ class Anchor(IntEnum):
     BOTTOM_RIGHT = 9
 '''
 
-data = rbin('1.atlas')
-atlas_cls = SpineAtlas(data)
+atlas = ReadAtlasFile('1.atlas')
 # The default anchor point for Spine Atlas clipping is the top left corner
-atlas_cls.atlas.cutp = Anchor.BOTTOM_LEFT
-ReOffset(atlas_cls.atlas) # Recalculate clipping X/Y starting from the upper left corner
-text = atlas_cls.atlas.ConvertText # List[str]
-sline('1_ReOffset.atlas', text)
+atlas.cutp = Anchor.BOTTOM_LEFT
+atlas.ReOffset() # Recalculate clipping X/Y starting from the upper left corner
+atlas.SaveAtlas('1_1_ReOffset.atlas')
 ```
 # Recalculate the Offset anchor point
 ```python
-from SpineAtlas import rbin, sline, Anchor, SpineAtlas, ReOffset
+from SpineAtlas import ReadAtlasFile, Anchor
 
 '''
 class Anchor(IntEnum):
@@ -144,13 +114,11 @@ class Anchor(IntEnum):
     BOTTOM_RIGHT = 9
 '''
 
-data = rbin('1.atlas')
-atlas_cls = SpineAtlas(data)
+atlas = ReadAtlasFile('1.atlas')
 # The default anchor point for Spine Atlas Offset is the bottom left corner
-atlas_cls.atlas.offp = Anchor.TOP_LEFT
-ReOffset(atlas_cls.atlas) # Recalculate Offset X/Y starting from the bottom left corner
-text = atlas_cls.atlas.ConvertText # List[str]
-sline('1_ReOffset.atlas', text)
+atlas.offp = Anchor.TOP_LEFT
+atlas.ReOffset() # Recalculate Offset X/Y starting from the bottom left corner
+atlas.SaveAtlas('1_1_ReOffset.atlas')
 ```
 # Convert image to premultiplied/non-premultiplied
 ```python
