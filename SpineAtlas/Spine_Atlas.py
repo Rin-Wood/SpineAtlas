@@ -6,7 +6,7 @@ from json import dumps as djson
 from attrs import define, field, Factory
 from typing import Union, List, Tuple, Type, Dict, Callable
 from numpy import array as nparr, clip as npcp, dstack as npdst, uint8
-from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr
+from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr, open as imgop
 
 def ctext(data: bytes, encoding: str = '') -> str:
     if encoding:
@@ -76,6 +76,7 @@ class AtlasTex:
     pma: Union[bool, str] = False
     scale: float = 1.0
     frames: List[AtlasFrame] = field(default=Factory(list))
+    tex: Image = None
 
     def __attrs_post_init__(self):
         if isinstance(self.w, str):
@@ -92,6 +93,135 @@ class Atlas:
     offp: Anchor = Anchor.BOTTOM_LEFT
     version: bool = False # True Atlas-4.0 / False - Atlas-3.8
     covt: Union[Type[int], Callable[[float], int]] = int
+    path: Path = None
+    name: str = ''
+
+    def SaveAtlas(self, path: Union[Path, str] = None, encoding: str = 'utf-8'):
+        old = self.covt
+        self.covt = int
+        if path is None and self.path is None:
+            p = Path().cwd()
+        else:
+            p = (Path(path) if isinstance(path, str) else path) if path is not None else self.path
+        if path is None:
+            p.mkdir(parents=True, exist_ok=True)
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+        if path is None: p = p.joinpath(f'{self.name}.atlas')
+        atlas = self.ConvertText
+        sline(p, atlas, encoding)
+        self.covt = old
+
+    def SaveFrames(self, path: Union[Path, str] = None, texpath: Union[Path, str] = None):
+        if path is None and self.path is None:
+            p = Path().cwd().joinpath(self.name)
+        else:
+            p = (Path(path) if isinstance(path, str) else path) if path is not None else self.path.joinpath(self.name)
+        if texpath is None and self.path is None:
+            p2 = Path().cwd()
+        else:
+            p2 = (Path(texpath) if isinstance(texpath, str) else texpath) if texpath is not None else self.path
+        imgs = self.Frames(p2)
+        for k, v in imgs.items():
+            w = p.joinpath(k)
+            w.parent.mkdir(parents=True, exist_ok=True)
+            v.save(f'{w.as_posix()}.png', format='PNG')
+
+    def Frames(self, path: Union[Path, str] = None) -> Dict[str, Image]:
+        if path is None and self.path is None:
+            p = Path().cwd()
+        else:
+            p = (Path(path) if isinstance(path, str) else path) if path is not None else self.path
+        imgs:Dict[str, Image] = {}
+        for i in self.atlas:
+            if i.tex is not None:
+                tex = i.tex
+            else:
+                p = p.joinpath(i.png)
+                if not p.is_file():
+                    print(f'Miss Tex - {p}')
+                    continue
+                tex = imgop(p.as_posix())
+            for j in i.frames:
+                imgs[j.name] = CutFrame(tex, j)
+        return imgs
+
+    def ReScale(self, path: Union[Path, str] = None):
+        if path is None and self.path is None:
+            p = Path().cwd()
+        else:
+            p = (Path(path) if isinstance(path, str) else path) if path is not None else self.path
+        for i in self.atlas:
+            if i.tex is not None:
+                tex = i.tex
+                w, h = tex.size
+            else:
+                t = p.joinpath(i.png)
+                if not t.is_file():
+                    print(f'Miss Tex - {t}')
+                    continue
+                if rbin(t, 4) == b'\x89PNG':
+                    tex = rbin(i.png, 24)[16:]
+                    w, h = int.from_bytes(tex[:4], byteorder='big'), int.from_bytes(tex[4:], byteorder='big')
+                else:
+                    tex = imgop(t.as_posix())
+                    w, h = tex.size
+            wscale, hscale = w / i.w, h / i.h
+            AtlasScale(i, wscale, hscale, self.covt)
+            i.w, i.h = w, h
+
+    def ReOffset(self):
+        checka, checkb = self.atlas.cutp != Anchor.TOP_LEFT, self.atlas.offp != Anchor.BOTTOM_LEFT
+        indexa, indexb = self.atlas.cutp.value, self.atlas.offp.value
+        if not checka and not checkb: return
+        for i in self.atlas.atlas:
+            for j in i.frames:
+                if checka:
+                    if indexa == 2:
+                        j.cutx = ((i.w - j.cutw) / 2) + j.cutx
+                    elif indexa == 3:
+                        j.cutx = i.w - (j.cutw + j.cutx)
+                    elif indexa == 4:
+                        j.cuty = ((i.h - j.cuth) / 2) + j.cuty
+                    elif indexa == 5:
+                        j.cutx = ((i.w - j.cutw) / 2) + j.cutx
+                        j.cuty = ((i.h - j.cuth) / 2) + j.cuty
+                    elif indexa == 6:
+                        j.cutx = i.w - (j.cutw + j.cutx)
+                        j.cuty = ((i.h - j.cuth) / 2) + j.cuty
+                    elif indexa == 7:
+                        j.cuty = i.h - (j.cuth + j.cuty)
+                    elif indexa == 8:
+                        j.cutx = ((i.w - j.cutw) / 2) + j.cutx
+                        j.cuty = i.h - (j.cuth + j.cuty)
+                    elif indexa == 9:
+                        j.cutx = i.w - (j.cutw + j.cutx)
+                        j.cuty = i.h - (j.cuth + j.cuty)
+                if checkb:
+                    if indexb == 1:
+                        j.offy = j.offh - (j.cuth + j.offy)
+                    elif indexb == 2:
+                        j.offx = ((j.offw - j.cutw) / 2) + j.offx
+                        j.offy = j.offh - (j.cuth + j.offy)
+                    elif indexb == 3:
+                        j.offx = j.offw - (j.cutw + j.offx)
+                        j.offy = j.offh - (j.cuth + j.offy)
+                    elif indexb == 4:
+                        j.offy = ((j.offh - j.cuth) / 2) + j.offy
+                    elif indexb == 5:
+                        j.offx = ((j.offw - j.cutw) / 2) + j.offx
+                        j.offy = ((j.offh - j.cuth) / 2) + j.offy
+                    elif indexb == 6:
+                        j.offx = j.offw - (j.cutw + j.offx)
+                        j.offy = ((j.offh - j.cuth) / 2) + j.offy
+                    elif indexb == 8:
+                        j.offx = ((j.offw - j.cutw) / 2) + j.offx
+                        j.offy = j.offh - (j.cuth + j.offy)
+                    elif indexb == 9:
+                        j.offx = j.offw - (j.cutw + j.offx)
+                        j.offy = j.offh - (j.cuth + j.offy)
+        self.atlas.cutp = Anchor.TOP_LEFT
+        self.atlas.offp = Anchor.BOTTOM_LEFT
 
     @property
     def ConvertText(self) -> List[str]:
@@ -134,9 +264,9 @@ class Atlas4:
 class LineTextReader:
     __slots__ = ('stream', 'length', 'pos')
 
-    def __init__(self, string: Union[str, bytes, bytearray, List[str]], start: int = 0):
+    def __init__(self, string: Union[str, bytes, bytearray, List[str]], encoding: str = 'utf-8', start: int = 0):
         if isinstance(string, (bytes, bytearray)):
-            self.stream = ctext(string).splitlines()
+            self.stream = ctext(string, encoding).splitlines()
         elif isinstance(string, str):
             self.stream = string.splitlines()
         else:
@@ -168,8 +298,8 @@ class SpineAtlas:
     version: bool
     atlas: Atlas
 
-    def __init__(self, string: Union[str, bytes, bytearray, List[str]], verison: bool = None):
-        self.reader = LineTextReader(string)
+    def __init__(self, string: Union[str, bytes, bytearray, List[str]], verison: bool = None, encoding: str = 'utf-8', path: Path = None, name: str = ''):
+        self.reader = LineTextReader(string, encoding)
         self.version = False
         if verison is not None:
             self.version = verison
@@ -180,6 +310,8 @@ class SpineAtlas:
         else:
             self.version = 'bounds:' in djson(string)
         self.parse()
+        if path is not None: self.atlas.path = path
+        self.atlas.name = name if name else Path(self.atlas.atlas[0].png).stem
 
     def parse(self):
         (self.atlas4 if self.version else self.atlas3)()
@@ -260,62 +392,9 @@ def AtlasScale(atlas: AtlasTex, wscale: float = 1.0, hscale: float = 1.0, covt: 
             setattr(i, j, covt(v * k))
         if check:
             i.cutw, i.cuth, i.offx, i.offy, i.offw, i.offh = i.cuth, i.cutw, i.offy, i.offx, i.offh, i.offw
-        i.valt = float
+        i.valt = covt
     factor = (wscale, atlas.w) if wscale < hscale else (hscale, atlas.h)
     atlas.scale = round((factor[0] / (factor[0] * factor[1])) * atlas.scale, 2)
-
-def ReOffset(atlas: Atlas):
-    checka, checkb = atlas.cutp != Anchor.TOP_LEFT, atlas.offp != Anchor.BOTTOM_LEFT
-    indexa, indexb = atlas.cutp.value, atlas.offp.value
-    if not checka and not checkb: return
-    for i in atlas.atlas:
-        for j in i.frames:
-            if checka:
-                if indexa == 2:
-                    j.cutx = ((i.w - j.cutw) / 2) + j.cutx
-                elif indexa == 3:
-                    j.cutx = i.w - (j.cutw + j.cutx)
-                elif indexa == 4:
-                    j.cuty = ((i.h - j.cuth) / 2) + j.cuty
-                elif indexa == 5:
-                    j.cutx = ((i.w - j.cutw) / 2) + j.cutx
-                    j.cuty = ((i.h - j.cuth) / 2) + j.cuty
-                elif indexa == 6:
-                    j.cutx = i.w - (j.cutw + j.cutx)
-                    j.cuty = ((i.h - j.cuth) / 2) + j.cuty
-                elif indexa == 7:
-                    j.cuty = i.h - (j.cuth + j.cuty)
-                elif indexa == 8:
-                    j.cutx = ((i.w - j.cutw) / 2) + j.cutx
-                    j.cuty = i.h - (j.cuth + j.cuty)
-                elif indexa == 9:
-                    j.cutx = i.w - (j.cutw + j.cutx)
-                    j.cuty = i.h - (j.cuth + j.cuty)
-            if checkb:
-                if indexb == 1:
-                    j.offy = j.offh - (j.cuth + j.offy)
-                elif indexb == 2:
-                    j.offx = ((j.offw - j.cutw) / 2) + j.offx
-                    j.offy = j.offh - (j.cuth + j.offy)
-                elif indexb == 3:
-                    j.offx = j.offw - (j.cutw + j.offx)
-                    j.offy = j.offh - (j.cuth + j.offy)
-                elif indexb == 4:
-                    j.offy = ((j.offh - j.cuth) / 2) + j.offy
-                elif indexb == 5:
-                    j.offx = ((j.offw - j.cutw) / 2) + j.offx
-                    j.offy = ((j.offh - j.cuth) / 2) + j.offy
-                elif indexb == 6:
-                    j.offx = j.offw - (j.cutw + j.offx)
-                    j.offy = ((j.offh - j.cuth) / 2) + j.offy
-                elif indexb == 8:
-                    j.offx = ((j.offw - j.cutw) / 2) + j.offx
-                    j.offy = j.offh - (j.cuth + j.offy)
-                elif indexb == 9:
-                    j.offx = j.offw - (j.cutw + j.offx)
-                    j.offy = j.offh - (j.cuth + j.offy)
-    atlas.cutp = Anchor.TOP_LEFT
-    atlas.offp = Anchor.BOTTOM_LEFT
 
 def CutFrameFloat(tex: Image, frame: AtlasFrame) -> Image:
     x, y, w, h = frame.offx, frame.offy, frame.offw, frame.offh
@@ -380,3 +459,11 @@ def ImgNonPremultiplied(image: Image) -> Image:
     tex.paste(im=image, box=(0, 0), mask=a)
     tex.putalpha(a)
     return tex
+
+def ReadAtlas(data: Union[str, bytes, bytearray, List[str]], verison: bool = None, encoding: str = 'utf-8', path: Union[Path, str] = None, name: str = '') -> Atlas:
+    p = None if path is None else (Path(path) if isinstance(path, str) else path)
+    return SpineAtlas(data, verison, encoding, p).atlas
+
+def ReadAtlasFile(fp: Union[str, Path], verison: bool = None, encoding: str = 'utf-8', path: Union[Path, str] = None, name: str = '') -> Atlas:
+    p = (Path(fp) if isinstance(fp, str) else fp).parent if path is None else (Path(path) if isinstance(path, str) else path)
+    return SpineAtlas(rbin(fp), verison, encoding, p).atlas
