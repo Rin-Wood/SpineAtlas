@@ -137,11 +137,11 @@ class Atlas:
             if i.tex is not None:
                 tex = i.tex
             else:
-                p = p.joinpath(i.png)
-                if not p.is_file():
-                    print(f'Miss Tex - {p}')
+                p2 = p.joinpath(i.png)
+                if not p2.is_file():
+                    print(f'Miss Tex - {p2}')
                     continue
-                tex = imgop(p.as_posix())
+                tex = imgop(p2.as_posix())
             for j in i.frames:
                 imgs[j.name] = CutFrame(tex, j)
         return imgs
