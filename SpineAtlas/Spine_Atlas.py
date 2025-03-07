@@ -161,7 +161,7 @@ class Atlas:
                     print(f'Miss Tex - {t}')
                     continue
                 if rbin(t, 4) == b'\x89PNG':
-                    tex = rbin(i.png, 24)[16:]
+                    tex = rbin(t, 24)[16:]
                     w, h = int.from_bytes(tex[:4], byteorder='big'), int.from_bytes(tex[4:], byteorder='big')
                 else:
                     tex = imgop(t.as_posix())
