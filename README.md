@@ -15,9 +15,18 @@ from SpineAtlas import ReadAtlasFile
 
 atlas = ReadAtlasFile('1.atlas')
 # The code will automatically determine the format of Atlas
-atlas.version = True # Convert to Atlas 4.0 format
 atlas.version = False # Convert to Atlas 3.0 format
+atlas.version = True # Convert to Atlas 4.0 format
 atlas.SaveAtlas('1_v4.atlas')
+```
+# Check if the atlas is missing a textures
+```python
+from SpineAtlas import ReadAtlasFile
+
+atlas = ReadAtlasFile('1.atlas')
+# If the texture and atlas are in the same directory, you don't need to pass the path
+miss = atlas.CheckTextures()
+# If `miss` is empty, it means there is no missing textures
 ```
 # Modify the texture scaling of the atlas
 ```python
@@ -34,7 +43,11 @@ from SpineAtlas import ReadAtlasFile
 
 atlas = ReadAtlasFile('1.atlas')
 # If the texture and atlas are in the same directory, you don't need to pass the texture path
-atlas.SaveFrames(path='1_frames')
+# mode : ['Normal', 'Premul', 'NonPremul']
+# --- Normal - do not process the texture
+# --- Premul - convert the texture to premultiplied
+# --- NonPremul - convert the texture to non-premultiplied
+atlas.SaveFrames(path='1_frames', mode='Premul')
 ```
 # Convert other formats to `Spine Atlas`
 ```python
