@@ -139,7 +139,7 @@ class Atlas:
             else:
                 p2 = p.joinpath(i.png)
                 if not p2.is_file():
-                    print(f'Miss Tex - {p2}')
+                    print(f'Miss Texture - {p2.as_posix()}')
                     continue
                 tex = imgop(p2.as_posix())
             if mode == 'Premul':
@@ -151,6 +151,18 @@ class Atlas:
             for j in i.frames:
                 imgs[j.name] = CutFrame(img, j)
         return imgs
+
+    def CheckTextures(self, path: Union[Path, str] = None) -> List[str]:
+        if path is None and self.path is None:
+            p = Path().cwd()
+        else:
+            p = (Path(path) if isinstance(path, str) else path) if path is not None else self.path
+        misstex = []
+        for i in self.atlas:
+            p2 = p.joinpath(i.png)
+            if not p2.is_file():
+                misstex.append(p2.as_posix())
+        return misstex
 
     def ReScale(self, path: Union[Path, str] = None):
         if path is None and self.path is None:
@@ -164,7 +176,7 @@ class Atlas:
             else:
                 t = p.joinpath(i.png)
                 if not t.is_file():
-                    print(f'Miss Tex - {t}')
+                    print(f'Miss Texture - {t.as_posix()}')
                     continue
                 if rbin(t, 4) == b'\x89PNG':
                     tex = rbin(t, 24)[16:]
@@ -473,3 +485,22 @@ def ReadAtlas(data: Union[str, bytes, bytearray, List[str]], verison: bool = Non
 def ReadAtlasFile(fp: Union[str, Path], verison: bool = None, encoding: str = 'utf-8', path: Union[Path, str] = None, name: str = '') -> Atlas:
     p = (Path(fp) if isinstance(fp, str) else fp).parent if path is None else (Path(path) if isinstance(path, str) else path)
     return SpineAtlas(rbin(fp), verison, encoding, p).atlas
+
+def CheckAtlasTextures(path: Union[str, Path] = '', subfolder: bool = True, suffix: str = '*.atlas'):
+    p = Path(path) if path else Path.cwd()
+    ls = [i for i in (p.rglob(suffix) if subfolder else p.glob(suffix)) if i.is_file()]
+    check = True
+    for i in ls:
+        try:
+            atlas = ReadAtlasFile(i)
+        except:
+            print(f'ReadError {i.as_posix()}')
+            continue
+        miss = atlas.CheckTextures()
+        if miss:
+            check = False
+            file = i.as_posix()
+            for j in miss:
+                print(f'{file} MissTextures ---- {j}')
+    if check:
+        print('All spines have no missing textures')
