@@ -4,7 +4,7 @@ from pathlib import Path
 from itertools import cycle
 from json import dumps as djson
 from attrs import define, field, Factory
-from typing import Union, List, Tuple, Type, Dict, Callable
+from typing import Union, List, Tuple, Type, Dict, Callable, Literal
 from numpy import array as nparr, clip as npcp, dstack as npdst, uint8
 from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr, open as imgop
 
@@ -112,7 +112,7 @@ class Atlas:
         sline(p, atlas, encoding)
         self.covt = old
 
-    def SaveFrames(self, path: Union[Path, str] = None, texpath: Union[Path, str] = None):
+    def SaveFrames(self, path: Union[Path, str] = None, texpath: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal'):
         if path is None and self.path is None:
             p = Path().cwd().joinpath(self.name)
         else:
@@ -121,13 +121,13 @@ class Atlas:
             p2 = Path().cwd()
         else:
             p2 = (Path(texpath) if isinstance(texpath, str) else texpath) if texpath is not None else self.path
-        imgs = self.Frames(p2)
+        imgs = self.Frames(p2, mode)
         for k, v in imgs.items():
             w = p.joinpath(k)
             w.parent.mkdir(parents=True, exist_ok=True)
             v.save(f'{w.as_posix()}.png', format='PNG')
 
-    def Frames(self, path: Union[Path, str] = None) -> Dict[str, Image]:
+    def Frames(self, path: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal') -> Dict[str, Image]:
         if path is None and self.path is None:
             p = Path().cwd()
         else:
@@ -142,8 +142,14 @@ class Atlas:
                     print(f'Miss Tex - {p2}')
                     continue
                 tex = imgop(p2.as_posix())
+            if mode == 'Premul':
+                img = ImgPremultiplied(tex)
+            elif mode == 'NonPremul':
+                img = ImgNonPremultiplied(tex)
+            else:
+                img = tex
             for j in i.frames:
-                imgs[j.name] = CutFrame(tex, j)
+                imgs[j.name] = CutFrame(img, j)
         return imgs
 
     def ReScale(self, path: Union[Path, str] = None):
