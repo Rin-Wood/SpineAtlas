@@ -185,6 +185,8 @@ class Atlas:
                     tex = imgop(t.as_posix())
                     w, h = tex.size
             wscale, hscale = w / i.w, h / i.h
+            factor = (i.w, w) if wscale < hscale else (i.h, h)
+            i.scale = round((factor[0] / factor[1]) * i.scale, 2)
             AtlasScale(i, wscale, hscale, self.covt)
             i.w, i.h = w, h
 
@@ -254,7 +256,7 @@ class Atlas:
                     atlas.extend([j.name, f'bounds:{cutd[0]},{cutd[1]},{cutd[2]},{cutd[3]}'])
                     offd = self.covt(j.offx), self.covt(j.offy), self.covt(j.offw), self.covt(j.offh)
                     if offd != (0, 0, cutd[2], cutd[3]):
-                        atlas.extend([j.name, f'bounds:{offd[0]},{offd[1]},{offd[2]},{offd[3]}'])
+                        atlas.append(f'offsets:{offd[0]},{offd[1]},{offd[2]},{offd[3]}')
                     if j.rota != 0:
                         atlas.append(f'rotate:{j.rota}')
                 atlas.append('')
@@ -411,8 +413,6 @@ def AtlasScale(atlas: AtlasTex, wscale: float = 1.0, hscale: float = 1.0, covt: 
         if check:
             i.cutw, i.cuth, i.offx, i.offy, i.offw, i.offh = i.cuth, i.cutw, i.offy, i.offx, i.offh, i.offw
         i.valt = covt
-    factor = (wscale, atlas.w) if wscale < hscale else (hscale, atlas.h)
-    atlas.scale = round((factor[0] / (factor[0] * factor[1])) * atlas.scale, 2)
 
 def CutFrameFloat(tex: Image, frame: AtlasFrame) -> Image:
     x, y, w, h = frame.offx, frame.offy, frame.offw, frame.offh
