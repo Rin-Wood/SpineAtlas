@@ -191,10 +191,10 @@ class Atlas:
             i.w, i.h = w, h
 
     def ReOffset(self):
-        checka, checkb = self.atlas.cutp != Anchor.TOP_LEFT, self.atlas.offp != Anchor.BOTTOM_LEFT
-        indexa, indexb = self.atlas.cutp.value, self.atlas.offp.value
+        checka, checkb = self.cutp != Anchor.TOP_LEFT, self.offp != Anchor.BOTTOM_LEFT
+        indexa, indexb = self.cutp.value, self.offp.value
         if not checka and not checkb: return
-        for i in self.atlas.atlas:
+        for i in self.atlas:
             for j in i.frames:
                 if checka:
                     if indexa == 2:
@@ -240,8 +240,8 @@ class Atlas:
                     elif indexb == 9:
                         j.offx = j.offw - (j.cutw + j.offx)
                         j.offy = j.offh - (j.cuth + j.offy)
-        self.atlas.cutp = Anchor.TOP_LEFT
-        self.atlas.offp = Anchor.BOTTOM_LEFT
+        self.cutp = Anchor.TOP_LEFT
+        self.offp = Anchor.BOTTOM_LEFT
 
     @property
     def ConvertText(self) -> List[str]:
