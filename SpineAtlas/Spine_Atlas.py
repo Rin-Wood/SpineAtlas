@@ -124,7 +124,7 @@ class Atlas:
         sline(p, atlas, encoding)
         self.covt = old
 
-    def SaveFrames(self, path: Union[Path, str] = None, texpath: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal'):
+    def SaveFrames(self, path: Union[Path, str] = None, texpath: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal', useScale: bool = False):
         if path is None and self.path is None:
             p = Path().cwd().joinpath(self.name)
         else:
@@ -133,13 +133,13 @@ class Atlas:
             p2 = Path().cwd()
         else:
             p2 = (Path(texpath) if isinstance(texpath, str) else texpath) if texpath is not None else self.path
-        imgs = self.Frames(p2, mode)
+        imgs = self.Frames(p2, mode, useScale=useScale)
         for k, v in imgs.items():
             w = p.joinpath(k)
             w.parent.mkdir(parents=True, exist_ok=True)
             v.save(f'{w.as_posix()}.png', format='PNG')
 
-    def Frames(self, path: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal') -> Dict[str, Image]:
+    def Frames(self, path: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal', useScale: bool = False) -> Dict[str, Image]:
         if path is None and self.path is None:
             p = Path().cwd()
         else:
@@ -161,7 +161,11 @@ class Atlas:
             else:
                 img = tex
             for j in i.frames:
-                imgs[j.name] = CutFrame(img, j)
+                cutImg = CutFrame(img, j)
+                if useScale:
+                    w, h = cutImg.size
+                    cutImg = cutImg.resize((int(w * i.scale), int(h * i.scale)), resample=BICUBIC)
+                imgs[j.name] = cutImg
         return imgs
 
     def CheckTextures(self, path: Union[Path, str] = None) -> List[str]:
@@ -176,13 +180,18 @@ class Atlas:
                 misstex.append(p2.as_posix())
         return misstex
 
-    def ReScale(self, path: Union[Path, str] = None):
+    def ReScale(self, path: Union[Path, str] = None, scale: Union[int, float, Tuple[Union[int, float], Union[int, float]]] = None):
         if path is None and self.path is None:
             p = Path().cwd()
         else:
             p = (Path(path) if isinstance(path, str) else path) if path is not None else self.path
         for i in self.atlas:
-            if i.tex is not None:
+            if scale is not None:
+                if isinstance(scale, tuple):
+                    w, h = scale[0] * i.w, scale[1] * i.h
+                else:
+                    w, h = scale * i.w, scale * i.h
+            elif i.tex is not None:
                 tex = i.tex
                 w, h = tex.size
             else:
@@ -195,7 +204,8 @@ class Atlas:
                 else:
                     tex = imgop(t.as_posix())
                     w, h = tex.size
-            if w == i.w and h == i.h: continue
+            if w == i.w and h == i.h:
+                continue
             wscale, hscale = w / i.w, h / i.h
             factor = (i.w, w) if wscale < hscale else (i.h, h)
             i.scale = round((factor[0] / factor[1]) * i.scale, 2)
@@ -261,8 +271,10 @@ class Atlas:
         if self.version:
             for i in self.atlas:
                 atlas.extend([i.png, f'size:{self.covt(i.w)},{self.covt(i.h)}', 'filter:Linear,Linear'])
-                if i.pma: atlas.append('pma:true')
-                if i.scale != 1.0: atlas.append(f'scale:{i.scale}')
+                if i.pma:
+                    atlas.append('pma:true')
+                if i.scale != 1.0:
+                    atlas.append(f'scale:{i.scale}')
                 for j in i.frames:
                     cutd = self.covt(j.cutx), self.covt(j.cuty), self.covt(j.cutw), self.covt(j.cuth)
                     atlas.extend([j.name, f'bounds:{cutd[0]},{cutd[1]},{cutd[2]},{cutd[3]}'])
@@ -310,8 +322,10 @@ class LineTextReader:
     def uread(self, number: int = 1, repa: str = '', repb: str = '', mode: bool = True) -> Union[str, List[str]]:
         end = min(self.pos + number, self.length)
         lines = self.stream[self.pos:end]
-        if repa: lines = [line.replace(repa, repb) for line in lines]
-        if mode: self.pos = end
+        if repa:
+            lines = [line.replace(repa, repb) for line in lines]
+        if mode:
+            self.pos = end
         return (lines[0] if number == 1 else lines) if lines else ''
 
     def read(self, number: int = 1, repa: str = '', repb: str = '') -> Union[str, List[str]]:
@@ -331,6 +345,10 @@ class SpineAtlas:
     atlas: Atlas
 
     def __init__(self, string: Union[str, bytes, bytearray, List[str]], verison: bool = None, encoding: str = 'utf-8', path: Path = None, name: str = ''):
+        if isinstance(string, (bytes, bytearray)):
+            string = string.replace(b'\t', '')
+        elif isinstance(string, str):
+            string = string.replace('\t', '')
         self.reader = LineTextReader(string, encoding)
         self.version = False
         if verison is not None:
@@ -429,11 +447,14 @@ def AtlasScale(atlas: AtlasTex, wscale: float = 1.0, hscale: float = 1.0, covt: 
 def CutFrameFloat(tex: Image, frame: AtlasFrame) -> Image:
     x, y, w, h = frame.offx, frame.offy, frame.offw, frame.offh
     cx, cy, cw, ch = frame.cutx, frame.cuty, frame.cutw, frame.cuth
-    if frame.rota != 180 and frame.rota != -180 and frame.rota != 0: cw, ch = ch, cw
+    if frame.rota != 180 and frame.rota != -180 and frame.rota != 0:
+        cw, ch = ch, cw
     matrix = (1, 0, cx, 0, 1, cy)
     cut = tex.transform((ceil(cw), ceil(ch)), AFFINE, matrix, resample=BICUBIC)
-    if frame.rota != 0: cut = cut.rotate(frame.rota * -1, expand=True)
-    if frame.rota != 180 and frame.rota != -180 and frame.rota != 0: cw, ch = ch, cw
+    if frame.rota != 0:
+        cut = cut.rotate(frame.rota * -1, expand=True)
+    if frame.rota != 180 and frame.rota != -180 and frame.rota != 0:
+        cw, ch = ch, cw
     matrix = (1, 0, x * -1, 0, 1, (h - y - ch) * -1)
     return cut.transform((ceil(w), ceil(h)), AFFINE, matrix, resample=BICUBIC)
 
@@ -442,7 +463,8 @@ def CutFrameInt(tex: Image, frame: AtlasFrame) -> Image:
     cx, cy, cw, ch = frame.cutx, frame.cuty, frame.cutw, frame.cuth
     cw2, ch2 = (cx + ch, cy + cw) if frame.rota != 180 and frame.rota != -180 and frame.rota != 0 else (cx + cw, cy + ch)
     cut = tex.crop((cx, cy, cw2, ch2))
-    if frame.rota != 0: cut = cut.rotate(frame.rota * -1, expand=True)
+    if frame.rota != 0:
+        cut = cut.rotate(frame.rota * -1, expand=True)
     img = imgcr('RGBA', (w, h), (0, 0, 0, 0))
     img.paste(cut, (x, (h - y - ch)))
     return img
