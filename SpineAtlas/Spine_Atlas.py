@@ -346,7 +346,7 @@ class SpineAtlas:
 
     def __init__(self, string: Union[str, bytes, bytearray, List[str]], verison: bool = None, encoding: str = 'utf-8', path: Path = None, name: str = ''):
         if isinstance(string, (bytes, bytearray)):
-            string = string.replace(b'\t', '')
+            string = string.replace(b'\t', b'')
         elif isinstance(string, str):
             string = string.replace('\t', '')
         self.reader = LineTextReader(string, encoding)
