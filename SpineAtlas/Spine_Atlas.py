@@ -9,15 +9,14 @@ from numpy import array as nparr, clip as npcp, dstack as npdst, uint8
 from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr, open as imgop
 
 def ctext(data: bytes, encoding: str = '') -> str:
-    if encoding:
+    encodings = [encoding] if encoding else []
+    encodings.extend(['utf-8', 'utf-8-sig', 'gbk', 'big5', 'shift_jis', 'cp1252', 'latin1'])
+    for enc in encodings:
         try:
-            return data.decode(encoding)
+            return data.decode(enc)
         except:
-            pass
-    try:
-        return data.decode('utf-8')
-    except:
-        return data.decode('utf-8-sig')
+            continue
+    return data.decode('utf-8', errors='replace')
 
 def rbin(fp: Union[str, Path], number:int = 0) -> bytes:
     with open(fp, 'rb') as f:
@@ -26,6 +25,15 @@ def rbin(fp: Union[str, Path], number:int = 0) -> bytes:
 def sline(fp: Union[str, Path], data: List[str], encoding: str = 'utf-8') -> None:
     with open(fp, 'w', encoding=encoding) as f:
         f.write('\n'.join(data))
+
+def getPngSize(file: Union[str, Path, bytes, bytearray]) -> Tuple[int, int]:
+    tex = rbin(file, 24) if isinstance(file, (str, Path)) else file
+    if not tex.startswith(b'\x89PNG'):
+        raise ValueError('Invalid PNG file: missing PNG signature')
+    elif len(tex) < 24:
+        raise ValueError('Bytes Size Error')
+    tex = tex[16:24]
+    return int.from_bytes(tex[:4], byteorder='big'), int.from_bytes(tex[4:], byteorder='big')
 
 class Anchor(IntEnum):
     TOP_LEFT = 1
@@ -57,7 +65,8 @@ class AtlasFrame:
         t = self.valt
         for i in self.arrs:
             v = getattr(self, i)
-            if isinstance(v, t): continue
+            if isinstance(v, t):
+                continue
             setattr(self, i, t(v))
         if self.offw == 0:
             self.offw = self.cutw
@@ -85,6 +94,8 @@ class AtlasTex:
             self.h = int(self.h)
         if isinstance(self.pma, str):
             self.pma = self.pma == 'true'
+        if isinstance(self.scale, str):
+            self.scale = float(self.scale)
 
 @define(slots=True)
 class Atlas:
@@ -107,7 +118,8 @@ class Atlas:
             p.mkdir(parents=True, exist_ok=True)
         else:
             p.parent.mkdir(parents=True, exist_ok=True)
-        if path is None: p = p.joinpath(f'{self.name}.atlas')
+        if path is None:
+            p = p.joinpath(f'{self.name}.atlas')
         atlas = self.ConvertText
         sline(p, atlas, encoding)
         self.covt = old
@@ -179,11 +191,11 @@ class Atlas:
                     print(f'Miss Texture - {t.as_posix()}')
                     continue
                 if rbin(t, 4) == b'\x89PNG':
-                    tex = rbin(t, 24)[16:]
-                    w, h = int.from_bytes(tex[:4], byteorder='big'), int.from_bytes(tex[4:], byteorder='big')
+                    w, h = getPngSize(t)
                 else:
                     tex = imgop(t.as_posix())
                     w, h = tex.size
+            if w == i.w and h == i.h: continue
             wscale, hscale = w / i.w, h / i.h
             factor = (i.w, w) if wscale < hscale else (i.h, h)
             i.scale = round((factor[0] / factor[1]) * i.scale, 2)
@@ -400,7 +412,7 @@ class SpineAtlas:
         self.atlas: Atlas = Atlas(atlas, version=True)
 
 def AtlasScale(atlas: AtlasTex, wscale: float = 1.0, hscale: float = 1.0, covt: Union[Type[int], Type[float]] = int):
-    if wscale == 1.0 and hscale == 1.0: return
+    if int(wscale) == 1 and int(hscale) == 1: return
     wh = (wscale, hscale)
     for i in atlas.frames:
         rt = int(i.rota)
@@ -504,3 +516,5 @@ def CheckAtlasTextures(path: Union[str, Path] = '', subfolder: bool = True, suff
                 print(f'{file} MissTextures ---- {j}')
     if check:
         print('All spines have no missing textures')
+
+__all__ = ['Anchor', 'Atlas', 'AtlasFrame', 'AtlasTex', 'SpineAtlas', 'LineTextReader', 'rbin', 'sline', 'AtlasScale', 'CutFrame', 'AtlasImg', 'ImgPremultiplied', 'ImgNonPremultiplied', 'ReadAtlas', 'ReadAtlasFile', 'CheckAtlasTextures', 'getPngSize']
