@@ -8,9 +8,10 @@ from typing import Union, List, Tuple, Type, Dict, Callable, Literal
 from numpy import array as nparr, clip as npcp, dstack as npdst, uint8
 from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr, open as imgop
 
+_encodings = ['utf-8', 'utf-8-sig', 'gbk', 'big5', 'shift_jis', 'cp1252', 'latin1']
+
 def ctext(data: bytes, encoding: str = '') -> str:
-    encodings = [encoding] if encoding else []
-    encodings.extend(['utf-8', 'utf-8-sig', 'gbk', 'big5', 'shift_jis', 'cp1252', 'latin1'])
+    encodings = list(dict.fromkeys((([encoding] + _encodings) if encoding else _encodings)))
     for enc in encodings:
         try:
             return data.decode(enc)
@@ -430,7 +431,7 @@ class SpineAtlas:
         self.atlas: Atlas = Atlas(atlas, version=True)
 
 def AtlasScale(atlas: AtlasTex, wscale: float = 1.0, hscale: float = 1.0, covt: Union[Type[int], Type[float]] = int):
-    if int(wscale) == 1 and int(hscale) == 1: return
+    if wscale == 1.0 and hscale == 1.0: return
     wh = (wscale, hscale)
     for i in atlas.frames:
         rt = int(i.rota)
@@ -507,7 +508,7 @@ def ImgPremultiplied(image: Image) -> Image:
 def ImgNonPremultiplied(image: Image) -> Image:
     width, height = image.size
     a = image.split()[-1]
-    tex = imgcr("RGBA", (width, height), (0, 0, 0, 255))
+    tex = imgcr('RGBA', (width, height), (0, 0, 0, 255))
     tex.paste(im=image, box=(0, 0), mask=a)
     tex.putalpha(a)
     return tex
