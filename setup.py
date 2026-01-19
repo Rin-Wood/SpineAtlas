@@ -12,7 +12,7 @@ setup(
 	long_description_content_type='text/markdown',
     license="MIT",
     keywords="spine, Python, atlas, SpineAtlas",
-    install_requires=["attrs", "numpy", "Pillow"],
+    install_requires=["attrs", "Pillow"],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
