@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="SpineAtlas",
-    version="1.0.11",
+    version="1.0.12",
     author='wood',
     author_email='miraclerinwood@gmail.com',
     packages=["SpineAtlas"],
