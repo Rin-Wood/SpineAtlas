@@ -5,7 +5,6 @@ from itertools import cycle
 from json import dumps as djson
 from attrs import define, field, Factory
 from typing import Union, List, Tuple, Type, Dict, Callable, Literal
-from numpy import array as nparr, clip as npcp, dstack as npdst, uint8
 from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr, open as imgop
 
 _encodings = ['utf-8', 'utf-8-sig', 'gbk', 'big5', 'shift_jis', 'cp1252', 'latin1']
@@ -495,15 +494,13 @@ def AtlasImg(tex: Union[Image, Dict[str, Image]], atlas: Union[SpineAtlas, Atlas
     return imgs
 
 def ImgPremultiplied(image: Image) -> Image:
-    arr = nparr(image)
-    r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
-    mark = (a != 0)
-    alpha = 255.0 / a[mark]
-    r[mark] = npcp((r[mark] * alpha), 0, 255).astype(uint8)
-    g[mark] = npcp((g[mark] * alpha), 0, 255).astype(uint8)
-    b[mark] = npcp((b[mark] * alpha), 0, 255).astype(uint8)
-    tex = npdst((r, g, b, a))
-    return imgarr(tex)
+    if image.mode != 'RGBA':
+        image = image.convert('RGBA')
+    raw_data = image.tobytes()
+    premul_image = imgcr('RGBa', image.size)
+    premul_image.frombytes(raw_data)
+    tex = premul_image.convert('RGBA')
+    return tex
 
 def ImgNonPremultiplied(image: Image) -> Image:
     width, height = image.size
