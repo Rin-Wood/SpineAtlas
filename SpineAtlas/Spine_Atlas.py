@@ -5,7 +5,7 @@ from itertools import cycle
 from json import dumps as djson
 from attrs import define, field, Factory
 from typing import Union, List, Tuple, Type, Dict, Callable, Literal
-from PIL.Image import Image, AFFINE, BICUBIC, fromarray as imgarr, new as imgcr, open as imgop
+from PIL.Image import Image, AFFINE, BICUBIC, new as imgcr, open as imgop
 
 _encodings = ['utf-8', 'utf-8-sig', 'gbk', 'big5', 'shift_jis', 'cp1252', 'latin1']
 
@@ -124,6 +124,25 @@ class Atlas:
         sline(p, atlas, encoding)
         self.covt = old
 
+    def SaveAtlas4_0Scale(self, texPath: Union[Path, str] = None, outPath: Union[Path, str] = None):
+        if texPath is None and self.path is None:
+            p = Path().cwd()
+        else:
+            p = (Path(texPath) if isinstance(texPath, str) else texPath) if texPath is not None else self.path
+        p2 = (Path(outPath) if isinstance(outPath, str) else outPath) if outPath is not None else p
+        for i in self.atlas:
+            if (s := i.scale) == 1.0:
+                continue
+            AtlasScale(i, (scale := 1.0 / s), scale, self.covt)
+            if (t := p.joinpath((png := i.png))).is_file():
+                with imgop(t.as_posix()) as img:
+                    w, h = img.size
+                    w2, h2 = int(w * scale), int(h * scale)
+                    img.resize((w2, h2), BICUBIC).save(p2.joinpath(png))
+                    i.w, i.h = w2, h2
+            i.scale = 1.0
+        self.SaveAtlas(p2.joinpath(f'{self.name}.atlas'))
+
     def SaveFrames(self, path: Union[Path, str] = None, texpath: Union[Path, str] = None, mode: Literal['Normal', 'Premul', 'NonPremul'] = 'Normal', useScale: bool = False):
         if path is None and self.path is None:
             p = Path().cwd().joinpath(self.name)
@@ -162,9 +181,9 @@ class Atlas:
                 img = tex
             for j in i.frames:
                 cutImg = CutFrame(img, j)
-                if useScale:
+                if useScale and (s := i.scale) != 1.0:
                     w, h = cutImg.size
-                    cutImg = cutImg.resize((int(w * i.scale), int(h * i.scale)), resample=BICUBIC)
+                    cutImg = cutImg.resize((int(w * (scale := (1.0 / s))), int(h * scale)), resample=BICUBIC)
                 imgs[j.name] = cutImg
         return imgs
 
@@ -207,8 +226,8 @@ class Atlas:
             if w == i.w and h == i.h:
                 continue
             wscale, hscale = w / i.w, h / i.h
-            factor = (i.w, w) if wscale < hscale else (i.h, h)
-            i.scale = round((factor[0] / factor[1]) * i.scale, 2)
+            factor = wscale if wscale < hscale else hscale
+            i.scale = round(factor * i.scale, 2)
             AtlasScale(i, wscale, hscale, self.covt)
             i.w, i.h = w, h
 
