@@ -36,6 +36,11 @@ atlas = ReadAtlasFile('1.atlas')
 # If the texture and atlas are in the same directory, you don't need to pass the path
 atlas.ReScale()
 atlas.SaveAtlas('1_scale.atlas')
+
+# Atlas4.0
+atlas = ReadAtlasFile('1.atlas')
+atlas.version = False # If you want to save it as Atlas3.0
+atlas.SaveAtlas4_0Scale(outPath=r'D:\out_scale')
 ```
 # Export atlas frames
 ```python
